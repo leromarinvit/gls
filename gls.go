@@ -42,25 +42,31 @@ func SetValues(values Values) {
 // Set sets the value by key and associates it with the current goroutine.
 func Set(key string, value interface{}) {
 	gid := goid.Goid()
-	dataLock.Lock()
-	if data[gid] == nil {
-		data[gid] = Values{}
+	dataLock.RLock()
+	values := data[gid]
+	dataLock.RUnlock()
+	if values == nil {
+		dataLock.Lock()
+		values = data[gid]
+		if values == nil {
+			data[gid] = Values{}
+			values = data[gid]
+		}
+		dataLock.Unlock()
 	}
-	data[gid][key] = value
-	dataLock.Unlock()
+	values[key] = value
 }
 
 // Get gets the value by key as it exists for the current goroutine.
 func Get(key string) interface{} {
 	gid := goid.Goid()
 	dataLock.RLock()
-	if data[gid] == nil {
-		dataLock.RUnlock()
+	values := data[gid]
+	dataLock.RUnlock()
+	if values == nil {
 		return nil
 	}
-	value := data[gid][key]
-	dataLock.RUnlock()
-	return value
+	return values[key]
 }
 
 // Go creates a new goroutine and runs the provided function in that new
@@ -91,9 +97,9 @@ func Cleanup() {
 // getValues unlinks two goroutines
 func getValues() Values {
 	gid := goid.Goid()
-	dataLock.Lock()
+	dataLock.RLock()
 	values := data[gid]
-	dataLock.Unlock()
+	dataLock.RUnlock()
 	return values
 }
 
