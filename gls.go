@@ -1,7 +1,11 @@
 // Package gls implements goroutine-local storage.
 package gls
 
-import "sync"
+import (
+	"sync"
+
+	"github.com/leromarinvit/goid"
+)
 
 // Values is simply a map of key types to value types. Used by SetValues to
 // set multiple values at once.
@@ -11,11 +15,11 @@ var (
 	// dataLock protects access to the data map
 	dataLock sync.RWMutex
 	// data is a map of goroutine IDs that stores the key,value pairs
-	data map[uint64]Values
+	data map[int64]Values
 )
 
 func init() {
-	data = map[uint64]Values{}
+	data = map[int64]Values{}
 }
 
 // With is a convenience function that stores the given values on this
@@ -29,7 +33,7 @@ func With(values Values, f func()) {
 
 // SetValues replaces all values for this goroutine.
 func SetValues(values Values) {
-	gid := curGoroutineID()
+	gid := goid.Goid()
 	dataLock.Lock()
 	data[gid] = values
 	dataLock.Unlock()
@@ -37,7 +41,7 @@ func SetValues(values Values) {
 
 // Set sets the value by key and associates it with the current goroutine.
 func Set(key string, value interface{}) {
-	gid := curGoroutineID()
+	gid := goid.Goid()
 	dataLock.Lock()
 	if data[gid] == nil {
 		data[gid] = Values{}
@@ -48,7 +52,7 @@ func Set(key string, value interface{}) {
 
 // Get gets the value by key as it exists for the current goroutine.
 func Get(key string) interface{} {
-	gid := curGoroutineID()
+	gid := goid.Goid()
 	dataLock.RLock()
 	if data[gid] == nil {
 		dataLock.RUnlock()
@@ -78,7 +82,7 @@ func Go(f func()) {
 // called, the data may persist for the lifetime of your application. This
 // must be called from the very first goroutine to invoke Set
 func Cleanup() {
-	gid := curGoroutineID()
+	gid := goid.Goid()
 	dataLock.Lock()
 	delete(data, gid)
 	dataLock.Unlock()
@@ -86,7 +90,7 @@ func Cleanup() {
 
 // getValues unlinks two goroutines
 func getValues() Values {
-	gid := curGoroutineID()
+	gid := goid.Goid()
 	dataLock.Lock()
 	values := data[gid]
 	dataLock.Unlock()
@@ -96,7 +100,7 @@ func getValues() Values {
 // linkGRs links two goroutines together, allowing the child to access the
 // data present in the parent.
 func linkGRs(parentData Values) {
-	childID := curGoroutineID()
+	childID := goid.Goid()
 	dataLock.Lock()
 	data[childID] = parentData
 	dataLock.Unlock()
@@ -104,7 +108,7 @@ func linkGRs(parentData Values) {
 
 // unlinkGRs unlinks two goroutines
 func unlinkGRs() {
-	childID := curGoroutineID()
+	childID := goid.Goid()
 	dataLock.Lock()
 	delete(data, childID)
 	dataLock.Unlock()
